@@ -1,4 +1,37 @@
-const API = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
+const AUTH_TOKEN_KEY = "redraft.auth.token";
+
+export function apiBase() {
+  const fromEnv = String(import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host !== "localhost" && host !== "127.0.0.1") {
+      if (fromEnv && !fromEnv.includes("localhost")) return fromEnv;
+      return "https://redraft-iodz.onrender.com";
+    }
+  }
+  return fromEnv || "http://localhost:4000";
+}
+
+export function getAuthToken() {
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+export function setAuthToken(token: string) {
+  try {
+    if (token) localStorage.setItem(AUTH_TOKEN_KEY, token);
+    else localStorage.removeItem(AUTH_TOKEN_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearAuthToken() {
+  setAuthToken("");
+}
 
 const LLM_PROVIDER_KEY = "resume-analysis.llm.provider";
 const LLM_API_KEY = "resume-analysis.llm.key";
@@ -23,6 +56,8 @@ function applyLlmHeaders(headers: Headers) {
   const { provider, apiKey } = getLlmSettings();
   headers.set("x-llm-provider", provider);
   if (apiKey) headers.set("x-llm-key", apiKey);
+  const token = getAuthToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
 }
 
 export class ApiError extends Error {
@@ -39,18 +74,19 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
     headers.set("Content-Type", "application/json");
   }
   applyLlmHeaders(headers);
+  const base = apiBase();
   let res: Response;
   try {
-    res = await fetch(`${API}${path}`, {
+    res = await fetch(`${base}${path}`, {
       ...options,
       credentials: "include",
       headers,
     });
   } catch {
     throw new ApiError(
-      API.includes("localhost")
+      base.includes("localhost")
         ? "The site is calling localhost instead of the live API. Set VITE_API_URL on Vercel and redeploy."
-        : "Could not reach the API. Check VITE_API_URL and that Render is awake.",
+        : "Could not reach the API. Wait for Render to wake up, then try again.",
       0
     );
   }
@@ -62,13 +98,17 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   }
   const text = await res.text();
   if (!text) return undefined as T;
-  return JSON.parse(text) as T;
+  const data = JSON.parse(text) as T & { token?: string };
+  if (data && typeof data === "object" && "token" in data && data.token) {
+    setAuthToken(String(data.token));
+  }
+  return data;
 }
 
 export async function downloadExport(resumeId: string, format: "pdf" | "ppt", filename: string) {
   const headers = new Headers({ "Content-Type": "application/json" });
   applyLlmHeaders(headers);
-  const res = await fetch(`${API}/api/resumes/${resumeId}/export`, {
+  const res = await fetch(`${apiBase()}/api/resumes/${resumeId}/export`, {
     method: "POST",
     credentials: "include",
     headers,
@@ -144,7 +184,7 @@ export function takeImportedContent(): { content: import("../types/resume").Resu
 export async function downloadCoverExport(letterId: string, format: "pdf" | "docx", filename: string) {
   const headers = new Headers({ "Content-Type": "application/json" });
   applyLlmHeaders(headers);
-  const res = await fetch(`${API}/api/cover-letters/${letterId}/export`, {
+  const res = await fetch(`${apiBase()}/api/cover-letters/${letterId}/export`, {
     method: "POST",
     credentials: "include",
     headers,

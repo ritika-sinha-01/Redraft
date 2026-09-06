@@ -15,8 +15,14 @@ declare global {
   }
 }
 
+function readToken(req: Request) {
+  const header = req.headers.authorization;
+  if (header?.startsWith("Bearer ")) return header.slice(7).trim();
+  return (req.cookies?.token as string | undefined) || "";
+}
+
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const token = req.cookies?.token as string | undefined;
+  const token = readToken(req);
   if (!token) {
     res.status(401).json({ error: "Authentication required" });
     return;
@@ -35,7 +41,7 @@ export function signToken(payload: AuthPayload): string {
 }
 
 export function optionalAuth(req: Request, _res: Response, next: NextFunction) {
-  const token = req.cookies?.token as string | undefined;
+  const token = readToken(req);
   if (!token) {
     next();
     return;

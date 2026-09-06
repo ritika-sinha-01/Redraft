@@ -53,7 +53,7 @@ authRouter.post("/register", async (req, res, next) => {
     });
     const token = signToken({ userId: user.id, email: user.email });
     res.cookie("token", token, cookieOptions());
-    res.status(201).json({ user: publicUser(user) });
+    res.status(201).json({ user: publicUser(user), token });
   } catch (err) {
     next(err);
   }
@@ -82,7 +82,7 @@ authRouter.post("/login", async (req, res, next) => {
     }
     const token = signToken({ userId: user.id, email: user.email });
     res.cookie("token", token, cookieOptions());
-    res.json({ user: publicUser(user) });
+    res.json({ user: publicUser(user), token });
   } catch (err) {
     next(err);
   }
@@ -130,7 +130,7 @@ authRouter.post("/google", async (req, res, next) => {
     }
     const token = signToken({ userId: user.id, email: user.email });
     res.cookie("token", token, cookieOptions());
-    res.json({ user: publicUser(user) });
+    res.json({ user: publicUser(user), token });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Could not sign in with Google";
     if (message.includes("GOOGLE_CLIENT_ID") || message.includes("verified email")) {

@@ -14,16 +14,25 @@ import { coverLettersRouter } from "./routes/coverLetters";
 
 const app = express();
 
+function isAllowedOrigin(origin?: string) {
+  if (!origin) return true;
+  const clean = origin.replace(/\/$/, "");
+  if (env.clientOrigins.includes(clean)) return true;
+  try {
+    const host = new URL(clean).hostname;
+    return host === "localhost" || host === "127.0.0.1" || host.endsWith(".vercel.app");
+  } catch {
+    return false;
+  }
+}
+
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || env.clientOrigins.includes(origin)) {
-        callback(null, true);
-        return;
-      }
-      callback(null, false);
+      callback(null, isAllowedOrigin(origin));
     },
     credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization", "x-llm-provider", "x-llm-key"],
   })
 );
 app.use(express.json({ limit: "12mb" }));
