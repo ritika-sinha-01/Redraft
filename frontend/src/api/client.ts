@@ -1,14 +1,14 @@
 const AUTH_TOKEN_KEY = "redraft.auth.token";
 
 export function apiBase() {
-  const fromEnv = String(import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
   if (typeof window !== "undefined") {
     const host = window.location.hostname;
+    if (host.endsWith("onrender.com")) return "";
     if (host !== "localhost" && host !== "127.0.0.1") {
-      if (fromEnv && !fromEnv.includes("localhost")) return fromEnv;
       return "https://redraft-iodz.onrender.com";
     }
   }
+  const fromEnv = String(import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
   return fromEnv || "http://localhost:4000";
 }
 
