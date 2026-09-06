@@ -96,6 +96,7 @@ export function SettingsPage() {
           </button>
         </form>
 
+        {user?.hasPassword !== false ? (
         <form className="card space-y-4 p-6" onSubmit={changePassword}>
           <h2 className="serif text-2xl">Change password</h2>
           <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
@@ -122,10 +123,17 @@ export function SettingsPage() {
             Update password
           </button>
         </form>
+        ) : (
+          <div className="card space-y-2 p-6">
+            <h2 className="serif text-2xl">Password</h2>
+            <p className="text-sm text-[var(--muted)]">This account signs in with Google. There is no password to change.</p>
+          </div>
+        )}
 
         <form className="card space-y-4 p-6" onSubmit={deleteAccount}>
           <h2 className="serif text-2xl">Delete account</h2>
           <p className="text-sm text-[var(--muted)]">Removes your account, resumes, letters, and applications.</p>
+          {user?.hasPassword !== false ? (
           <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
             Confirm with password
             <input
@@ -136,7 +144,10 @@ export function SettingsPage() {
               onChange={(e) => setDeletePassword(e.target.value)}
             />
           </label>
-          <button className="btn btn-ghost" disabled={busy || !deletePassword} type="submit">
+          ) : (
+            <p className="text-sm text-[var(--muted)]">You signed in with Google. Confirm below to delete.</p>
+          )}
+          <button className="btn btn-ghost" disabled={busy || (user?.hasPassword !== false && !deletePassword)} type="submit">
             Delete my account
           </button>
         </form>

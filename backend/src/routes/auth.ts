@@ -4,6 +4,8 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma";
 import { requireAuth, signToken, cookieOptions } from "../middleware/auth";
 import { publicUser } from "../lib/user";
+import { env } from "../config/env";
+import { verifyGoogleIdToken } from "../services/googleAuth";
 
 function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
@@ -15,6 +17,8 @@ const userSelect = {
   name: true,
   role: true,
   subscriptionStatus: true,
+  googleId: true,
+  passwordSet: true,
 } as const;
 
 export const authRouter = Router();
@@ -67,6 +71,10 @@ authRouter.post("/login", async (req, res, next) => {
       res.status(401).json({ error: "Invalid email or password" });
       return;
     }
+    if (!user.passwordSet) {
+      res.status(401).json({ error: "This account uses Google. Click Continue with Google." });
+      return;
+    }
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) {
       res.status(401).json({ error: "Invalid email or password" });
@@ -83,6 +91,54 @@ authRouter.post("/login", async (req, res, next) => {
 authRouter.post("/logout", (_req, res) => {
   res.clearCookie("token", { ...cookieOptions(), maxAge: 0 });
   res.json({ ok: true });
+});
+
+authRouter.get("/google", (_req, res) => {
+  res.json({ clientId: env.googleClientId, enabled: Boolean(env.googleClientId) });
+});
+
+authRouter.post("/google", async (req, res, next) => {
+  try {
+    if (!env.googleClientId) {
+      res.status(503).json({ error: "Google sign-in is not configured yet." });
+      return;
+    }
+    const { idToken } = req.body as { idToken?: string };
+    if (!idToken) {
+      res.status(400).json({ error: "Google did not return a sign-in token." });
+      return;
+    }
+    const profile = await verifyGoogleIdToken(idToken);
+    let user = await prisma.user.findFirst({
+      where: { OR: [{ googleId: profile.googleId }, { email: profile.email }] },
+    });
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email: profile.email,
+          name: profile.name,
+          googleId: profile.googleId,
+          passwordHash: await bcrypt.hash(randomBytes(32).toString("hex"), 10),
+          passwordSet: false,
+        },
+      });
+    } else if (!user.googleId) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { googleId: profile.googleId },
+      });
+    }
+    const token = signToken({ userId: user.id, email: user.email });
+    res.cookie("token", token, cookieOptions());
+    res.json({ user: publicUser(user) });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Could not sign in with Google";
+    if (message.includes("GOOGLE_CLIENT_ID") || message.includes("verified email")) {
+      res.status(401).json({ error: message });
+      return;
+    }
+    next(err);
+  }
 });
 
 authRouter.get("/me", requireAuth, async (req, res, next) => {
@@ -135,6 +191,10 @@ authRouter.post("/change-password", requireAuth, async (req, res, next) => {
       res.status(401).json({ error: "User not found" });
       return;
     }
+    if (!user.passwordSet) {
+      res.status(400).json({ error: "This account uses Google. There is no password to change." });
+      return;
+    }
     const ok = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!ok) {
       res.status(401).json({ error: "Current password is wrong." });
@@ -162,6 +222,10 @@ authRouter.post("/forgot-password", async (req, res, next) => {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
       res.status(404).json({ error: "No account with that email." });
+      return;
+    }
+    if (!user.passwordSet) {
+      res.status(400).json({ error: "This account uses Google. Sign in with Google instead." });
       return;
     }
     await prisma.passwordResetToken.deleteMany({ where: { userId: user.id, usedAt: null } });
@@ -211,19 +275,21 @@ authRouter.post("/reset-password", async (req, res, next) => {
 authRouter.delete("/account", requireAuth, async (req, res, next) => {
   try {
     const { password } = req.body as { password?: string };
-    if (!password) {
-      res.status(400).json({ error: "Enter your password to delete the account." });
-      return;
-    }
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user) {
       res.status(401).json({ error: "User not found" });
       return;
     }
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) {
-      res.status(401).json({ error: "Password is wrong." });
-      return;
+    if (user.passwordSet) {
+      if (!password) {
+        res.status(400).json({ error: "Enter your password to delete the account." });
+        return;
+      }
+      const ok = await bcrypt.compare(password, user.passwordHash);
+      if (!ok) {
+        res.status(401).json({ error: "Password is wrong." });
+        return;
+      }
     }
     await prisma.user.delete({ where: { id: user.id } });
     res.clearCookie("token", { ...cookieOptions(), maxAge: 0 });

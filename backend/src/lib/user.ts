@@ -1,6 +1,11 @@
 import { User } from "@prisma/client";
 
-export function publicUser(user: Pick<User, "id" | "email" | "name" | "role" | "subscriptionStatus">) {
+export function publicUser(
+  user: Pick<User, "id" | "email" | "name" | "role" | "subscriptionStatus"> & {
+    googleId?: string | null;
+    passwordSet?: boolean;
+  }
+) {
   const isPremium = user.role === "PREMIUM" && user.subscriptionStatus === "ACTIVE";
   return {
     id: user.id,
@@ -9,5 +14,7 @@ export function publicUser(user: Pick<User, "id" | "email" | "name" | "role" | "
     role: user.role,
     subscriptionStatus: user.subscriptionStatus,
     isPremium,
+    googleLinked: Boolean(user.googleId),
+    hasPassword: user.passwordSet !== false,
   };
 }

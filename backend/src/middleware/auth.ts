@@ -49,10 +49,11 @@ export function optionalAuth(req: Request, _res: Response, next: NextFunction) {
 }
 
 export function cookieOptions() {
+  const crossSite = process.env.NODE_ENV === "production";
   return {
     httpOnly: true,
-    sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
+    sameSite: (crossSite ? "none" : "lax") as "none" | "lax",
+    secure: crossSite,
     maxAge: 7 * 24 * 60 * 60 * 1000,
     path: "/",
   };

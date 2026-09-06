@@ -39,11 +39,21 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
     headers.set("Content-Type", "application/json");
   }
   applyLlmHeaders(headers);
-  const res = await fetch(`${API}${path}`, {
-    ...options,
-    credentials: "include",
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API}${path}`, {
+      ...options,
+      credentials: "include",
+      headers,
+    });
+  } catch {
+    throw new ApiError(
+      API.includes("localhost")
+        ? "The site is calling localhost instead of the live API. Set VITE_API_URL on Vercel and redeploy."
+        : "Could not reach the API. Check VITE_API_URL and that Render is awake.",
+      0
+    );
+  }
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
     const message =

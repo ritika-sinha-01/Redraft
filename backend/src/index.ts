@@ -16,12 +16,22 @@ const app = express();
 
 app.use(
   cors({
-    origin: env.clientOrigin,
+    origin(origin, callback) {
+      if (!origin || env.clientOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
+    },
     credentials: true,
   })
 );
 app.use(express.json({ limit: "12mb" }));
 app.use(cookieParser());
+
+app.get("/", (_req, res) => {
+  res.json({ ok: true, service: "Redraft API", health: "/api/health" });
+});
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });

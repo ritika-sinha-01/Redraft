@@ -20,6 +20,7 @@
     "cors": "^2.8.5",
     "docx": "^9.7.1",
     "express": "^5.1.0",
+    "google-auth-library": "^11.0.2",
     "jsonwebtoken": "^9.0.2",
     "mammoth": "^1.12.2",
     "pdf-parse": "^1.1.1",

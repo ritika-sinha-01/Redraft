@@ -8,6 +8,8 @@ export interface AuthUser {
   role: string;
   subscriptionStatus: string;
   isPremium: boolean;
+  googleLinked?: boolean;
+  hasPassword?: boolean;
 }
 
 interface AuthState {

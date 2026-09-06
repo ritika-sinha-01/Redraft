@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, ApiError } from "../api/client";
+import { AuthDivider, GoogleSignInButton } from "../components/auth/GoogleSignInButton";
 import { AuthFrame } from "../components/layout/AuthFrame";
 import { useAuthStore, type AuthUser } from "../store/authStore";
 
@@ -48,6 +49,8 @@ export function RegisterPage() {
 
   return (
     <AuthFrame title="Create your account" subtitle="A resume in minutes — templates, ATS, and export included.">
+      <GoogleSignInButton next="/templates" />
+      <AuthDivider />
       <form noValidate onSubmit={onSubmit} className="space-y-4">
         {error ? <p className="form-error">{error}</p> : null}
         <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
