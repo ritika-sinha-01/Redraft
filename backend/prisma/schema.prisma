@@ -1,0 +1,213 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Forward-compatible 5-MVP schema. MVP 1 uses User, Template, Resume.
+// Remaining models are scaffolded for MVPs 2–5.
+
+model User {
+  id                 String   @id @default(cuid())
+  email              String   @unique
+  passwordHash       String
+  name               String
+  role               String   @default("USER") // USER | PREMIUM (MVP 5)
+  subscriptionStatus String   @default("NONE") // NONE | ACTIVE | CANCELED | PAST_DUE (MVP 5)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  resumes           Resume[]
+  reviewsGiven      Review[]          @relation("Reviewer")
+  reviewsReceived   Review[]          @relation("Reviewee")
+  subscriptions     Subscription[]
+  applications      JobApplication[]
+  portfolios        Portfolio[]
+  payments          Payment[]
+  atsRuns           AtsRun[]
+  coverLetters      CoverLetter[]
+  resetTokens       PasswordResetToken[]
+}
+
+model Template {
+  id           String   @id @default(cuid())
+  name         String
+  slug         String   @unique
+  thumbnail    String
+  isPremium    Boolean  @default(false)
+  layoutConfig String   @default("{}")
+  createdAt    DateTime @default(now())
+
+  resumes Resume[]
+}
+
+model Resume {
+  id                 String   @id @default(cuid())
+  userId             String
+  templateId         String
+  title              String   @default("Untitled Resume")
+  content            String
+  designPreferences  String   @default("{}")
+  layoutPreferences  String   @default("{}")
+  shareSlug          String?  @unique
+  isPublic           Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template     Template         @relation(fields: [templateId], references: [id])
+  sharedLinks  SharedLink[]
+  versions     ResumeVersion[]
+  reviews      Review[]
+  applications JobApplication[]
+  atsRuns      AtsRun[]
+  coverLetters CoverLetter[]
+
+  @@index([userId])
+}
+
+model SharedLink {
+  id        String    @id @default(cuid())
+  resumeId  String
+  token     String    @unique
+  isPublic  Boolean   @default(true)
+  viewCount Int       @default(0)
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+}
+
+model ResumeVersion {
+  id        String   @id @default(cuid())
+  resumeId  String
+  snapshot  String
+  label     String   @default("")
+  createdAt DateTime @default(now())
+
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  userId    String
+  amount    Int      @default(999)
+  currency  String   @default("INR")
+  method    String
+  status    String   @default("PAID")
+  last4     String   @default("")
+  upiId     String   @default("")
+  bank      String   @default("")
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AtsRun {
+  id             String   @id @default(cuid())
+  userId         String
+  resumeId       String
+  score          Int
+  report         String
+  label          String   @default("")
+  jobDescription String   @default("")
+  createdAt      DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@index([resumeId])
+}
+
+model Review {
+  id             String   @id @default(cuid())
+  resumeId       String
+  reviewerId     String?
+  revieweeId     String
+  isProfessional Boolean  @default(false)
+  feedback       String   @default("")
+  status         String   @default("OPEN")
+  createdAt      DateTime @default(now())
+
+  resume   Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  reviewer User?  @relation("Reviewer", fields: [reviewerId], references: [id])
+  reviewee User   @relation("Reviewee", fields: [revieweeId], references: [id])
+}
+
+model Subscription {
+  id         String   @id @default(cuid())
+  userId     String
+  plan       String   @default("PREMIUM")
+  status     String   @default("ACTIVE")
+  provider   String   @default("stripe")
+  providerId String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+}
+
+model JobApplication {
+  id             String    @id @default(cuid())
+  userId         String
+  resumeId       String
+  jobTitle       String
+  company        String
+  jobUrl         String    @default("")
+  status         String    @default("SAVED")
+  notes          String    @default("")
+  followUpAt     DateTime?
+  jobDescription String    @default("")
+  coverLetterId  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+}
+
+model Portfolio {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String   @default("My Portfolio")
+  data      String   @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CoverLetter {
+  id             String   @id @default(cuid())
+  userId         String
+  resumeId       String?
+  title          String   @default("Cover letter")
+  company        String   @default("")
+  role           String   @default("")
+  jobDescription String   @default("")
+  content        String   @default("{}")
+  design         String   @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resume Resume? @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+}
